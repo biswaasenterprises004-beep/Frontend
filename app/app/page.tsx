@@ -1,6 +1,6 @@
 'use client';
 import { jwtDecode } from "jwt-decode"
-
+import * as XLSX from "xlsx"
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, LogOut, Users, TrendingUp, Clock, Briefcase, Download, Plus, Eye, Edit2, Trash2, Mail } from 'lucide-react';
@@ -69,6 +69,8 @@ useEffect(() => {
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false)
+const [excelFile, setExcelFile] = useState<File | null>(null)
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -464,6 +466,31 @@ const handleStatusChange = async (
   }
 };
 
+const sendEmployeesToBackend = async (employees:any[]) => {
+
+  const token = localStorage.getItem("token")
+
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/employees/import`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ employees })
+    }
+  )
+
+  if(res.ok){
+
+    alert("Employees imported successfully")
+
+    setImportModalOpen(false)
+
+    fetchEmployees()
+  }
+}
 
   const stats = {
     totalEmployees: employees.length,
@@ -472,6 +499,61 @@ const handleStatusChange = async (
     permanentLabours: employees.filter(emp => emp.type === 'Permanent').length,
     totalAdvancesTaken: employees.reduce((sum, emp) => sum + emp.liability, 0),
   };
+
+
+
+const downloadTemplate = () => {
+
+  const data = [
+    {
+      name: "",
+      age: "",
+      contact: "",
+      address: "",
+      skill: "",
+      specialization: "",
+      status: "Active",
+      type: "Permanent",
+      salary: "",
+      hours: "",
+      pendingSalary: "",
+      liability: ""
+    }
+  ]
+
+  const worksheet = XLSX.utils.json_to_sheet(data)
+  const workbook = XLSX.utils.book_new()
+
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Employees")
+
+  XLSX.writeFile(workbook, "employee_import_template.xlsx")
+}
+
+const handleImport = async () => {
+
+  if (!excelFile) {
+    alert("Please select a file")
+    return
+  }
+
+  const reader = new FileReader()
+
+  reader.onload = async (event) => {
+
+    const data = new Uint8Array(event.target?.result as ArrayBuffer)
+
+    const workbook = XLSX.read(data, { type: "array" })
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+
+    const employees = XLSX.utils.sheet_to_json(sheet)
+
+    await sendEmployeesToBackend(employees)
+  }
+
+  reader.readAsArrayBuffer(excelFile)
+}
+
 
   const handleExportCSV = () => {
     // Define CSV headers - all employee details
@@ -942,6 +1024,12 @@ if (!authorized) return null
                 <Download size={18} />
                 Export
               </button>
+              <button
+  onClick={() => setImportModalOpen(true)}
+  className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
+>
+  Import
+</button>
               <button
                 onClick={handleAddLabourClick}
                 className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
@@ -1669,6 +1757,50 @@ if (!authorized) return null
           </div>
         </div>
       )}
+
+      {importModalOpen && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+
+    <div className="bg-white rounded-lg shadow-xl w-[500px] p-6">
+
+      <h2 className="text-xl font-semibold mb-4">
+        Import Employees
+      </h2>
+
+      <input
+        type="file"
+        accept=".xlsx,.xls"
+        onChange={(e) => setExcelFile(e.target.files?.[0] || null)}
+        className="mb-4"
+      />
+
+      <div className="flex gap-3">
+
+        <button
+          onClick={downloadTemplate}
+          className="px-4 py-2 bg-green-500 text-white rounded"
+        >
+          Download Template
+        </button>
+
+        <button
+          onClick={handleImport}
+          className="px-4 py-2 bg-blue-600 text-white rounded"
+        >
+          Import
+        </button>
+
+        <button
+          onClick={() => setImportModalOpen(false)}
+          className="px-4 py-2 bg-gray-300 rounded"
+        >
+          Cancel
+        </button>
+
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
