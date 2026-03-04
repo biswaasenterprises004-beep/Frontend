@@ -1,0 +1,1350 @@
+"use client"
+import { jwtDecode } from "jwt-decode"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { ArrowLeft, Plus, Calendar, DollarSign, MapPin, Users, Phone, Edit, Trash2, X, LogOut, Search, Download, Mail } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+type CreateEvent = {
+  title: string
+  status: string
+  date: string
+  location: string
+  employees: number
+  phone: string
+  askedPayment: number
+  paidAmount: number
+}
+
+
+type Event = {
+  _id: string
+  title: string
+  status: string
+  date: string
+  location: string
+  employees: number
+  phone: string
+  askedPayment: number
+  paidAmount: number
+}
+
+const initialEvents: Event[] = []
+
+const summaryStats = [
+  { label: "Total Events", value: "3", icon: Calendar, color: "border-l-blue-600" },
+  { label: "Total Revenue", value: "₹430,000", icon: DollarSign, color: "border-l-green-500" },
+  { label: "Amount Received", value: "₹230,000", icon: DollarSign, color: "border-l-orange-500" },
+  { label: "Pending Payment", value: "₹200,000", icon: DollarSign, color: "border-l-indigo-600" },
+]
+
+
+
+function getStatusStyles(status: string) {
+  switch (status) {
+    case "Upcoming":
+      return "bg-red-50 text-red-700 border border-red-300 text-xs font-bold px-3 py-1"
+    case "Ongoing":
+      return "bg-yellow-50 text-yellow-700 border border-yellow-300 text-xs font-bold px-3 py-1"
+    case "Completed":
+      return "bg-green-50 text-green-700 border border-green-300 text-xs font-bold px-3 py-1"
+    default:
+      return "bg-gray-50 text-gray-700 border border-gray-200 text-lg font-bold px-4 py-2"
+  }
+}
+
+function formatCurrency(amount?: number) {
+  return `₹${(amount ?? 0).toLocaleString("en-IN")}`
+}
+
+
+
+function StatCard({ label, value, icon: Icon, color }: { label: string; value: string; icon: typeof Calendar; color: string }) {
+  const showIcon = label === "Total Events"
+  return (
+    <div className={`bg-white rounded-2xl shadow-sm p-5 border-l-4 ${color} flex items-center justify-between`}>
+      <div>
+        <p className="text-sm text-gray-500 mb-1">{label}</p>
+        <p className={`text-xl font-bold ${label === "Total Events" ? "text-gray-800" : label === "Total Revenue" ? "text-green-600" : label === "Amount Received" ? "text-orange-500" : "text-indigo-600"}`}>
+          {value}
+        </p>
+      </div>
+      {showIcon && (
+        <div className="text-blue-600">
+          <Icon className="w-8 h-8" />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AddEventModal({
+  isOpen,
+  onClose,
+  onAdd,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  onAdd: (newEvent: CreateEvent) => void
+}) {
+  const [formData, setFormData] = useState({
+    title: "",
+    date: "",
+    status: "Upcoming",
+    location: "",
+    phone: "",
+    employees: 0,
+    askedPayment: 0,
+    paidAmount: 0,
+  })
+  const [error, setError] = useState("")
+  
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        title: "",
+        date: "",
+        status: "Upcoming",
+        location: "",
+        phone: "",
+        employees: 0,
+        askedPayment: 0,
+        paidAmount: 0,
+      })
+      setError("")
+    }
+  }, [isOpen])
+
+  const handleSubmit = () => {
+    if (formData.title && formData.date && formData.location && formData.phone) {
+      onAdd(formData)
+      // Reset form
+      setFormData({
+        title: "",
+        date: "",
+        status: "Upcoming",
+        location: "",
+        phone: "",
+        employees: 0,
+        askedPayment: 0,
+        paidAmount: 0,
+      })
+      setError("")
+      onClose()
+    } else {
+      setError("Please fill all required fields (Event Name, Date, Venue, Contact).")
+    }
+  }
+
+  // Convert date from YYYY-MM-DD to DD/MM/YYYY for storage
+  const formatDateForStorage = (dateStr: string) => {
+    if (!dateStr) return ""
+    const [year, month, day] = dateStr.split("-")
+    return `${day}/${month}/${year}`
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent className="sm:max-w-lg p-0 overflow-hidden">
+        <DialogHeader className="bg-gradient-to-r from-blue-800 to-blue-900 text-white px-6 py-5">
+          <DialogTitle className="text-xl font-semibold text-white">Add New Event</DialogTitle>
+        </DialogHeader>
+
+        <div className="p-6 space-y-5">
+          {/* Event Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Event Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              placeholder=""
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Date and Status */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Event Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status <span className="text-red-500">*</span>
+              </label>
+              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                <SelectTrigger className="w-full px-4 py-3 h-auto border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Upcoming">Upcoming</SelectItem>
+                  <SelectItem value="Ongoing">Ongoing</SelectItem>
+                  <SelectItem value="Completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Venue */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Venue <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              placeholder=""
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Contact and Employees */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Contact <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                inputMode="numeric"
+                pattern="\\d*"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, "") })}
+                placeholder=""
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                maxLength={15}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Employees Provided <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                value={formData.employees || ""}
+                onChange={(e) => setFormData({ ...formData, employees: Number.parseInt(e.target.value) || 0 })}
+                placeholder=""
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Payment Fields */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Asked Payment (₹) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                value={formData.askedPayment || ""}
+                onChange={(e) => setFormData({ ...formData, askedPayment: Number.parseInt(e.target.value) || 0 })}
+                placeholder=""
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Paid Amount (₹) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                value={formData.paidAmount || ""}
+                onChange={(e) => setFormData({ ...formData, paidAmount: Number.parseInt(e.target.value) || 0 })}
+                placeholder=""
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          {error && <p className="text-sm text-red-500">{error}</p>}
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-3 px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-xl transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className="w-full py-3 px-4 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-xl transition-colors"
+            >
+              Add Event
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function EditEventModal({
+  event,
+  isOpen,
+  onClose,
+  onSave,
+}: {
+  event: Event | null
+  isOpen: boolean
+  onClose: () => void
+  onSave: (updatedEvent: Event) => void
+}) {
+  const [formData, setFormData] = useState<Event | null>(null)
+
+  // Update form data when event changes or modal opens
+useEffect(() => {
+  if (isOpen && event) {
+    setFormData(event)
+  }
+}, [isOpen, event])
+
+
+  if (!isOpen || !formData) return null
+
+  const handleSubmit = () => {
+    if (formData) {
+      onSave({
+        ...formData,
+      })
+      onClose()
+    }
+  }
+
+  // Convert date from DD/MM/YYYY to YYYY-MM-DD for input
+const formatDateForInput = (dateStr: string) => {
+  if (!dateStr) return ""
+
+  // If already in YYYY-MM-DD format, return as is
+  if (dateStr.includes("-")) {
+    return dateStr
+  }
+
+  // If in DD/MM/YYYY format
+  if (dateStr.includes("/")) {
+    const [day, month, year] = dateStr.split("/")
+    if (!day || !month || !year) return ""
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+  }
+
+  return ""
+}
+
+
+  // Convert date from YYYY-MM-DD to DD/MM/YYYY for storage
+  const formatDateForStorage = (dateStr: string) => {
+    const [year, month, day] = dateStr.split("-")
+    return `${day}/${month}/${year}`
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent className="sm:max-w-lg p-0 overflow-hidden">
+        <DialogHeader className="bg-gradient-to-r from-blue-800 to-blue-900 text-white px-6 py-5">
+          <DialogTitle className="text-xl font-semibold text-white">Edit Event</DialogTitle>
+        </DialogHeader>
+
+        <div className="p-6 space-y-5">
+          {/* Event Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Event Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Date and Status */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Event Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={formatDateForInput(formData.date)}
+                onChange={(e) => setFormData({ ...formData, date: formatDateForStorage(e.target.value) })}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status <span className="text-red-500">*</span>
+              </label>
+              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                <SelectTrigger className="w-full px-4 py-3 h-auto border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Upcoming">Upcoming</SelectItem>
+                  <SelectItem value="Ongoing">Ongoing</SelectItem>
+                  <SelectItem value="Completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Venue */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Venue <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Contact and Employees */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Contact <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                inputMode="numeric"
+                pattern="\\d*"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, "") })}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                maxLength={15}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Employees Provided <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                value={formData.employees}
+                onChange={(e) => setFormData({ ...formData, employees: Number.parseInt(e.target.value) || 0 })}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Payment Fields */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Asked Payment (₹) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                value={formData.askedPayment}
+                onChange={(e) => setFormData({ ...formData, askedPayment: Number.parseInt(e.target.value) || 0 })}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Paid Amount (₹) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                value={formData.paidAmount}
+                onChange={(e) => setFormData({ ...formData, paidAmount: Number.parseInt(e.target.value) || 0 })}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Pending Amount Display */}
+          <div className="p-4 bg-orange-50 border-2 border-orange-300 rounded-xl">
+            <p className="text-sm text-gray-600 mb-1">Pending Amount</p>
+            <p className="text-2xl font-bold text-orange-600">
+              ₹{(formData.askedPayment - formData.paidAmount).toLocaleString("en-IN")}
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-3 px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-xl transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className="w-full py-3 px-4 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-xl transition-colors"
+            >
+              Update Event
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function EventCard({
+  event,
+  onEdit,
+  onRequestDelete,
+  onChangeStatus,
+}: { event: Event; onEdit: (event: Event) => void; onRequestDelete: (event: Event) => void; onChangeStatus: (id: string, status: string) => void }) {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-6">
+      <div className="flex items-start justify-between mb-4">
+        <h3 className="text-3xl font-semibold text-blue-800">{event.title}</h3>
+        <div>
+          <Select value={event.status} onValueChange={(value) => onChangeStatus(event._id, value)}>
+            <SelectTrigger className={`rounded-full ${getStatusStyles(event.status)} h-auto px-3 py-1`}> 
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Upcoming">Upcoming</SelectItem>
+              <SelectItem value="Ongoing">Ongoing</SelectItem>
+              <SelectItem value="Completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-6 text-base text-gray-600 mb-5">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-gray-400" />
+          <span className="font-medium">{event.date}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <MapPin className="w-5 h-5 text-gray-400" />
+          <span className="font-medium">{event.location}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Users className="w-5 h-5 text-gray-400" />
+          <span className="font-medium">{event.employees} Employees</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Phone className="w-5 h-5 text-gray-400" />
+          <span className="font-medium">{event.phone}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 mb-5">
+        <div className="bg-blue-50 rounded-xl p-4">
+          <p className="text-xs text-gray-500 mb-1">Asked Payment</p>
+          <p className="text-lg font-bold text-blue-700">{formatCurrency(event.askedPayment)}</p>
+        </div>
+        <div className="bg-green-50 rounded-xl p-4">
+          <p className="text-xs text-gray-500 mb-1">Paid Amount</p>
+          <p className="text-lg font-bold text-green-600">{formatCurrency(event.paidAmount)}</p>
+        </div>
+        <div className="bg-orange-50 rounded-xl p-4">
+          <p className="text-xs text-gray-500 mb-1">Remaining Money</p>
+          <p className="text-lg font-bold text-orange-500">{formatCurrency(event.askedPayment - event.paidAmount)
+}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <button
+          onClick={() => onEdit(event)}
+          className="flex items-center justify-center gap-2 bg-orange-100 hover:bg-orange-200 text-orange-600 font-medium py-3 px-4 rounded-xl transition-colors"
+        >
+          <Edit className="w-4 h-4" />
+          Edit
+        </button>
+        <button
+          onClick={() => onRequestDelete(event)}
+          className="flex items-center justify-center gap-2 bg-red-100 hover:bg-red-200 text-red-500 font-medium py-3 px-4 rounded-xl transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+          Delete
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function EventDashboard() {
+  const router = useRouter()
+  const [isAuthorized, setIsAuthorized] = useState(false)
+
+const [role, setRole] = useState<string | null>(null)
+
+useEffect(() => {
+  const token = localStorage.getItem("token")
+  if (!token) return
+
+  try {
+    const decoded: any = jwtDecode(token)
+    setRole(decoded.role)
+  } catch {
+    setRole(null)
+  }
+}, [])
+
+
+    // 🔐 ROLE PROTECTION STARTS HERE
+useEffect(() => {
+  const token = localStorage.getItem("token")
+
+  if (!token) {
+    router.replace("/admin")
+    return
+  }
+
+  try {
+    const decoded: any = jwtDecode(token)
+
+    // ❌ Block employee_manager
+    if (decoded.role === "employee_manager") {
+      router.replace("/app")
+      return
+    }
+
+    // ❌ Block unknown roles
+    if (!["super_admin", "event_manager"].includes(decoded.role)) {
+      router.replace("/admin")
+      return
+    }
+
+    setRole(decoded.role)
+    setIsAuthorized(true)   // ✅ allow render
+
+  } catch (err) {
+    localStorage.removeItem("token")
+    router.replace("/admin")
+  }
+}, [])
+
+  // 🔐 ROLE PROTECTION ENDS HERE
+
+  const [events, setEvents] = useState<Event[]>(initialEvents)
+  const [isMounted, setIsMounted] = useState(false)
+  const [messages, setMessages] = useState<any[]>([])
+  const [msgsOpen, setMsgsOpen] = useState(false)
+  const [selectedMsg, setSelectedMsg] = useState<any | null>(null)
+  const [msgSearchQuery, setMsgSearchQuery] = useState('')
+
+
+
+
+useEffect(() => {
+  setIsMounted(true)
+}, [])
+
+useEffect(() => {
+  if (!isMounted) return
+
+  const token = localStorage.getItem("token")
+  if (!token) return
+
+  fetchEvents()
+
+}, [isMounted])
+
+
+
+  // Load events from localStorage on mount (client-side only)
+  // useEffect(() => {
+  //   setIsMounted(true)
+  //   const savedEvents = localStorage.getItem("dashboard-events")
+  //   if (savedEvents !== null) {
+  //     try {
+  //       const parsed = JSON.parse(savedEvents)
+  //       if (Array.isArray(parsed)) {
+  //         setEvents(parsed)
+  //       } else {
+  //         setEvents([])
+  //       }
+  //     } catch (error) {
+  //       console.error("Failed to parse saved events:", error)
+  //       setEvents([])
+  //     }
+  //   } else {f
+  //     setEvents([])
+  //   }
+  // }, [])
+
+  // // Consolidated save effect - runs after any event change
+  // useEffect(() => {
+  //   if (isMounted && events.length >= 0) {
+  //     try {
+  //       localStorage.setItem("dashboard-events", JSON.stringify(events))
+  //     } catch (e) {
+  //       console.error("Failed to save events to localStorage:", e)
+  //     }
+  //   }
+  // }, [events, isMounted])
+
+  // Load contact messages for header and listen for storage changes
+  // useEffect(() => {
+  //   try {
+  //     const raw = localStorage.getItem('contact-messages')
+  //     const list = raw ? JSON.parse(raw) : []
+  //     setMessages(list)
+  //   } catch (err) {
+  //     console.error('[event-dashboard] failed to read contact-messages', err)
+  //   }
+
+  //   function onStorage(e: StorageEvent) {
+  //     if (e.key !== 'contact-messages') return
+  //     try {
+  //       const raw = localStorage.getItem('contact-messages')
+  //       const list = raw ? JSON.parse(raw) : []
+  //       setMessages(list)
+  //     } catch (err) {
+  //       console.error('[event-dashboard] failed to parse storage event', err)
+  //     }
+  //   }
+  //   window.addEventListener('storage', onStorage)
+  //   return () => window.removeEventListener('storage', onStorage)
+  // }, [])
+
+
+
+
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<Event | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+
+  //Fetch events from backend database
+const fetchEvents = async () => {
+  const token = localStorage.getItem("token")
+  if (!token) return
+
+  try {
+    const res = await fetch("http://localhost:5000/api/events", {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+
+    if (!res.ok) {
+      console.error("Failed to fetch events:", res.status)
+      setEvents([])   // ✅ fallback safe
+      return
+    }
+
+    const data = await res.json()
+
+    if (Array.isArray(data)) {
+      setEvents(data)
+    } else {
+      console.error("Events response is not array:", data)
+      setEvents([])   // ✅ prevent crash
+    }
+
+  } catch (err) {
+    console.error("Fetch error:", err)
+    setEvents([])     // ✅ prevent crash
+  }
+}
+
+
+
+
+  const handleEditClick = (event: Event) => {
+    setEditingEvent(event)
+    setIsEditModalOpen(true)
+  }
+
+  // const handleSaveEvent = (updatedEvent: Event) => {
+  //   setEvents(prev => prev.map((e) => (e.id === updatedEvent.id ? updatedEvent : e)))
+  //   setEditingEvent(null)
+  // }
+  const handleSaveEvent = async (updatedEvent: Event) => {
+  const token = localStorage.getItem("token")
+  if (!token) return
+
+  try {
+    const res = await fetch(
+      `http://localhost:5000/api/events/${updatedEvent._id}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updatedEvent),
+      }
+    )
+
+    if (!res.ok) {
+      console.error("Update failed")
+      return
+    }
+
+    const data = await res.json()
+
+    setEvents(prev =>
+      prev.map(e => (e._id === data._id ? data : e))
+    )
+
+  } catch (err) {
+    console.error("Update error:", err)
+  }
+}
+
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false)
+    setEditingEvent(null)
+  }
+
+  // const handleAddEvent = (newEventData: Omit<Event, "id" | "remainingMoney">) => {
+  //   const newEvent: Event = {
+  //     ...newEventData,
+  //     id: events.length > 0 ? Math.max(...events.map((e) => e.id), 0) + 1 : 1,
+  //     date: newEventData.date.includes("-")
+  //       ? (() => {
+  //           const [year, month, day] = newEventData.date.split("-")
+  //           return `${day}/${month}/${year}`
+  //         })()
+  //       : newEventData.date,
+  //     remainingMoney: newEventData.askedPayment - newEventData.paidAmount,
+  //   }
+  //   setEvents(prev => [newEvent, ...prev])
+  // }
+const handleAddEvent = async (newEventData: CreateEvent) => {
+  const token = localStorage.getItem("token")
+  if (!token) return
+
+  try {
+    const res = await fetch("http://localhost:5000/api/events", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(newEventData)
+    })
+
+    if (!res.ok) {
+      console.error("Add failed")
+      return
+    }
+
+    const created = await res.json()
+
+    setEvents(prev => [created, ...prev])  // ✅ no full refetch
+
+  } catch (err) {
+    console.error("Failed to add event", err)
+  }
+}
+
+const handleDeleteEvent = async (eventId: string) => {
+  const token = localStorage.getItem("token")
+  if (!token) return
+
+  try {
+    const res = await fetch(
+      `http://localhost:5000/api/events/${eventId}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
+
+    if (!res.ok) {
+      console.error("Delete failed")
+      return
+    }
+
+    setEvents(prev => prev.filter(e => e._id !== eventId))
+    setDeleteConfirm(null)
+
+  } catch (err) {
+    console.error("Delete error:", err)
+  }
+}
+
+
+
+  const requestDeleteEvent = (event: Event) => {
+    setDeleteConfirm(event)
+  }
+
+const handleChangeEventStatus = async (id: string, status: string) => {
+  const token = localStorage.getItem("token")
+  if (!token) return
+
+  try {
+    const res = await fetch(
+      `http://localhost:5000/api/events/${id}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+      }
+    )
+
+    if (!res.ok) {
+      console.error("Status update failed")
+      return
+    }
+
+    const updatedEvent = await res.json()
+
+    setEvents(prev =>
+      prev.map(e => (e._id === updatedEvent._id ? updatedEvent : e))
+    )
+
+  } catch (err) {
+    console.error("Status update error:", err)
+  }
+}
+
+
+  const handleExport = () => {
+    const csv = [
+      ["Event Name", "Status", "Date", "Location", "Employees", "Contact", "Asked Payment", "Paid Amount", "Remaining Money"],
+      ...events.map((e) => [
+        e.title,
+        e.status,
+        e.date,
+        e.location,
+        e.employees,
+        e.phone,
+        e.askedPayment,
+        e.paidAmount
+      ]),
+    ]
+    const csvString = csv.map((row) => row.join(",")).join("\n")
+    const blob = new Blob([csvString], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "events.csv"
+    a.click()
+  }
+
+  const handleLogout = () => {
+    localStorage.clear()
+    router.replace("/admin")
+  }
+
+  // Calculate dynamic stats
+  const totalRevenue = events.reduce((sum, e) => sum + e.askedPayment, 0)
+  const amountReceived = events.reduce((sum, e) => sum + e.paidAmount, 0)
+  const pendingPayment = totalRevenue - amountReceived
+
+  const dynamicStats = [
+    { label: "Total Events", value: String(events.length), icon: Calendar, color: "border-l-blue-600" },
+    { label: "Total Revenue", value: formatCurrency(totalRevenue), icon: DollarSign, color: "border-l-green-500" },
+    { label: "Amount Received", value: formatCurrency(amountReceived), icon: DollarSign, color: "border-l-orange-500" },
+    { label: "Pending Payment", value: formatCurrency(pendingPayment), icon: DollarSign, color: "border-l-indigo-600" },
+  ]
+if (!isAuthorized) {
+  return null
+}
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-gradient-to-r from-blue-800 to-blue-900 text-white px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => router.push("/app")}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="text-xl font-semibold">Event Status Management</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <button 
+              type="button"
+              onClick={() => { setMsgsOpen(true); }}
+              className="px-3 py-2 bg-blue-800 hover:bg-blue-700 rounded-lg transition-colors text-white flex items-center gap-2"
+            >
+              <Mail size={16} />
+              {messages.length > 0 && (
+                <span className="inline-flex items-center justify-center rounded-full bg-red-500 text-xs font-semibold px-2 py-0.5">{messages.length}</span>
+              )}
+            </button>
+{role === "super_admin" && (
+  <button 
+    onClick={() => router.push("/app")}
+    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-5 rounded-full transition-colors"
+  >
+    <Users className="w-4 h-4" />
+    Employee Status
+  </button>
+)}
+
+            <button 
+              onClick={handleLogout}
+              className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-medium py-2.5 px-5 rounded-full transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto py-8">
+        {/* Summary Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {dynamicStats.map((stat) => (
+            <StatCard key={stat.label} {...stat} />
+          ))}
+        </div>
+
+        {/* Search and Actions */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-8 items-center">
+          <div className="flex-1 relative">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by event name, location, or contact..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-6 rounded-lg transition-colors whitespace-nowrap"
+          >
+            <Download className="w-5 h-5" />
+            Export
+          </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-medium py-3 px-6 rounded-lg transition-colors whitespace-nowrap"
+          >
+            <Plus className="w-5 h-5" />
+            Add Event
+          </button>
+        </div>
+
+        {/* Event Cards - Line by Line */}
+        <div className="flex flex-col gap-4">
+          {events
+            .filter(
+  (event) =>
+    (event.title ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (event.location ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (event.phone ?? "").includes(searchTerm)
+)
+
+            .map((event) => (
+              <EventCard key={event._id} event={event} onEdit={handleEditClick} onRequestDelete={requestDeleteEvent} onChangeStatus={handleChangeEventStatus} />
+            ))}
+        </div>
+      </main>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
+            <div className="bg-red-600 text-white px-6 py-4">
+              <h2 className="text-2xl font-bold">Confirm Delete</h2>
+            </div>
+
+            <div className="p-8">
+              <p className="text-gray-700 text-lg mb-2">
+                Are you sure you want to delete <span className="font-bold">{deleteConfirm.title}</span>?
+              </p>
+              <p className="text-gray-600 text-sm">
+                This action cannot be undone. The event will be permanently removed from the dashboard.
+              </p>
+
+              <div className="flex gap-4 justify-end mt-8">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteEvent(deleteConfirm._id)}
+                  className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Event Modal */}
+      <EditEventModal
+        event={editingEvent}
+        isOpen={isEditModalOpen}
+        onClose={handleCloseEditModal}
+        onSave={handleSaveEvent}
+      />
+
+      {/* Add Event Modal */}
+      <AddEventModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdd={handleAddEvent}
+      />
+
+      {/* Messages Modal */}
+      {msgsOpen && (
+        <div className="fixed inset-0 z-50 bg-gray-100">
+          <div className="h-full flex flex-col">
+            {/* Header */}
+            <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <Mail className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-800">Event Mailbox</h2>
+                  <p className="text-sm text-gray-500">Manage your events</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  className="px-4 py-2 rounded-lg bg-gray-100 text-sm text-gray-700 hover:bg-gray-200 transition"
+                  onClick={() => { localStorage.removeItem('contact-messages'); setMessages([]); setMsgsOpen(false); }}
+                >
+                  Clear
+                </button>
+                <button
+                  className="px-4 py-2 rounded-lg bg-blue-800 text-white text-sm hover:bg-blue-900 transition"
+                  onClick={() => setMsgsOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            {/* Main Content Area - Split Layout */}
+            <div className="flex flex-1 overflow-hidden">
+              {/* Left: Messages List */}
+              <div className="w-96 border-r bg-gray-50 overflow-y-auto">
+                <div className="p-4 space-y-4">
+                  {/* Search Bar */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                    <input
+                      type="text"
+                      placeholder="Search messages..."
+                      value={msgSearchQuery}
+                      onChange={(e) => setMsgSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+
+                  {/* Messages List */}
+                  {/* Messages List */}
+                  {messages.length === 0 && (
+                    <div className="py-16 text-center text-gray-500">
+                      <Mail className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                      <p className="text-lg">No messages</p>
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    {messages
+                      .filter((m: any) => {
+                        const query = msgSearchQuery.toLowerCase();
+                        return (
+                          m.name.toLowerCase().includes(query) ||
+                          m.email.toLowerCase().includes(query) ||
+                          m.subject?.toLowerCase().includes(query) ||
+                          m.message.toLowerCase().includes(query) ||
+                          m.phone.includes(query)
+                        );
+                      })
+                      .map((m: any) => {
+                      const isSelected = selectedMsg?.id === m.id;
+                      const messageDate = new Date(m.createdAt).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      });
+                      return (
+                        <div
+                          key={m.id}
+                          onClick={() => {
+                            setSelectedMsg(m);
+                            // Mark message as read
+                            const updated = messages.map(msg => msg.id === m.id ? {...msg, isRead: true} : msg);
+                            setMessages(updated);
+                            localStorage.setItem('contact-messages', JSON.stringify(updated));
+                          }}
+                          className={`p-4 rounded-lg cursor-pointer transition-all ${
+                            isSelected 
+                              ? 'bg-white border-2 border-orange-500 shadow-md'
+                              : m.status === 'accepted'
+                                ? 'bg-white border-2 border-transparent hover:border-2 hover:border-green-500 hover:shadow-md'
+                                : 'bg-white border-2 border-transparent hover:border-2 hover:border-red-500 hover:shadow-md'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
+                              m.status === 'accepted' ? 'bg-green-100' : 'bg-orange-100'
+                            }`}>
+                              <Mail className={`w-5 h-5 ${m.status === 'accepted' ? 'text-green-600' : 'text-orange-600'}`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-gray-800 text-sm">{m.subject || m.name || m.email}</h3>
+                              <p className="text-xs text-gray-500 mt-1">{m.name || m.email}</p>
+                              <p className="text-xs text-gray-600 mt-1 line-clamp-2">{m.message}</p>
+                              <p className="text-xs text-gray-400 mt-2">{messageDate}</p>
+                            </div>
+                            {!m.isRead && <div className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-500"></div>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Message Detail */}
+              <div className="flex-1 overflow-y-auto bg-white flex items-center justify-center p-6">
+                {!selectedMsg ? (
+                  <div className="text-center text-gray-400">
+                    <Mail className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <p>Select a message to view details</p>
+                  </div>
+                ) : (
+                  <div className="w-full max-w-2xl">
+                    {/* Title and Status */}
+                    <div className="mb-8">
+                      <div className="flex items-center justify-between mb-4">
+                        <h1 className="text-3xl font-bold text-gray-900">{selectedMsg.subject || selectedMsg.name}</h1>
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                          selectedMsg.status === 'accepted'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          {selectedMsg.status === 'accepted' ? 'Accepted' : 'Pending'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Requester Information */}
+                    <div className="mb-6 border border-blue-200 rounded-lg p-6 bg-blue-50">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Mail className="w-5 h-5 text-blue-600" />
+                        <h3 className="text-lg font-semibold text-gray-800">Requester Information</h3>
+                      </div>
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold mb-2">Name</p>
+                          <p className="text-gray-800 font-medium">{selectedMsg.name}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold mb-2">Email</p>
+                          <p className="text-gray-800 font-medium">{selectedMsg.email}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-xs text-gray-600 font-semibold mb-2">Contact Number</p>
+                          <p className="text-gray-800 font-medium flex items-center gap-2"><span>📞</span> {selectedMsg.phone}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Event Details */}
+                    <div className="mb-6 border border-orange-200 rounded-lg p-6 bg-orange-50">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-xl">📅</span>
+                        <h3 className="text-lg font-semibold text-gray-800">Event Details</h3>
+                      </div>
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold mb-2">Date</p>
+                          <p className="text-gray-800 font-medium">{new Date(selectedMsg.createdAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold mb-2">Time</p>
+                          <p className="text-gray-800 font-medium flex items-center gap-2"><span>🕐</span> 09:00 AM - 06:00 PM</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold mb-2">Location</p>
+                          <p className="text-gray-800 font-medium flex items-center gap-2"><span>📍</span> Mumbai Convention Center</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold mb-2">Required Workers</p>
+                          <p className="text-gray-800 font-medium flex items-center gap-2"><span>👥</span> 25 labours</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Event Description */}
+                    <div className="mb-6 border border-gray-200 rounded-lg p-6 bg-white">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-xl">📋</span>
+                        <h3 className="text-lg font-semibold text-gray-800">Event Description</h3>
+                      </div>
+                      <p className="text-gray-600 leading-relaxed">{selectedMsg.message}</p>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                      <button
+                        className="flex-1 px-6 py-3 rounded-lg bg-orange-500 text-white font-semibold hover:bg-orange-600 transition"
+                        onClick={() => {
+                          const updated = messages.map(m => m.id === selectedMsg.id ? {...m, status: 'accepted'} : m);
+                          setMessages(updated);
+                          localStorage.setItem('contact-messages', JSON.stringify(updated));
+                          setSelectedMsg({...selectedMsg, status: 'accepted'});
+                        }}
+                      >
+                        Accept Request
+                      </button>
+                      <button
+                        className="flex-1 px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
+                        onClick={() => {}}
+                      >
+                        Send Message
+                      </button>
+                      <button
+                        className="px-6 py-3 rounded-lg bg-gray-300 text-gray-700 font-semibold hover:bg-gray-400 transition"
+                        onClick={() => {
+                          const updated = messages.filter((m: any) => m.id !== selectedMsg.id);
+                          setMessages(updated);
+                          localStorage.setItem('contact-messages', JSON.stringify(updated));
+                          setSelectedMsg(null);
+                        }}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
