@@ -733,7 +733,7 @@ const fetchEvents = async () => {
   if (!token) return
 
   try {
-    const res = await fetch("http://localhost:5000/api/events", {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/events`, {
       headers: {
         Authorization: `Bearer ${token}`
       }
@@ -778,7 +778,7 @@ const fetchEvents = async () => {
 
   try {
     const res = await fetch(
-      `http://localhost:5000/api/events/${updatedEvent._id}`,
+      `${process.env.NEXT_PUBLIC_API_URL}/api/events/${updatedEvent._id}`,
       {
         method: "PUT",
         headers: {
@@ -830,7 +830,7 @@ const handleAddEvent = async (newEventData: CreateEvent) => {
   if (!token) return
 
   try {
-    const res = await fetch("http://localhost:5000/api/events", {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/events`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -859,7 +859,7 @@ const handleDeleteEvent = async (eventId: string) => {
 
   try {
     const res = await fetch(
-      `http://localhost:5000/api/events/${eventId}`,
+      `${process.env.NEXT_PUBLIC_API_URL}/api/events/${eventId}`,
       {
         method: "DELETE",
         headers: {
@@ -893,7 +893,7 @@ const handleChangeEventStatus = async (id: string, status: string) => {
 
   try {
     const res = await fetch(
-      `http://localhost:5000/api/events/${id}`,
+      `${process.env.NEXT_PUBLIC_API_URL}/api/events/${id}`,
       {
         method: "PUT",
         headers: {
