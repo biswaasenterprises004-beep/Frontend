@@ -94,10 +94,10 @@ export function Header() {
               key={item.name}
               href={item.href}
               className={cn(
-                "text-base font-medium transition-all duration-300 relative pb-1",
+                "relative rounded-md px-2 py-1 text-base font-medium transition-colors duration-150 ease-out",
                 pathname === item.href
-                  ? "text-[#1A4D8C] font-semibold after:absolute after:bottom-0 after:left-0 after:w-full after:h-0.5 after:bg-[#1A4D8C]"
-                  : "text-gray-800 hover:text-[#1A4D8C] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-[#1A4D8C] hover:after:w-full after:transition-all after:duration-300"
+                  ? "bg-[#1A4D8C]/10 text-[#1A4D8C] font-semibold after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:origin-left after:scale-x-100 after:bg-[#1A4D8C] after:transition-transform after:duration-150"
+                  : "text-gray-800 hover:bg-[#1A4D8C]/10 hover:text-[#1A4D8C] after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:origin-left after:scale-x-0 after:bg-[#1A4D8C] after:transition-transform after:duration-150 hover:after:scale-x-100"
               )}
             >
               {item.name}
@@ -164,10 +164,10 @@ export function Header() {
                 href={item.href}
                 onClick={() => setMobileMenuOpen(false)}
                 className={cn(
-                  "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                  "rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150 ease-out active:scale-[0.99]",
                   pathname === item.href
-                    ? "text-[#FF6E39]"
-                    : "text-gray-700 hover:text-[#FF6E39]"
+                    ? "bg-[#FF6E39]/10 text-[#FF6E39]"
+                    : "text-gray-700 hover:bg-[#FF6E39]/10 hover:translate-x-1 hover:text-[#FF6E39]"
                 )}
               >
                 {item.name}

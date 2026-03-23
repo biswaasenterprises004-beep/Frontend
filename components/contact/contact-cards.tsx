@@ -18,7 +18,7 @@ const contactMethods = [
   {
     icon: MapPin,
     title: "Visit Us",
-    info: "Kolkata, West Bengal\nOffice: 12/4 Park Street, Kolkata",
+    info: "Shop No. C-12 Ground floor, Prabhat Darshan Building,\nGolibar Road, Khar (E), Mumbai -400051",
     color: "text-[#1A4D8C]",
     bgColor: "bg-[#1A4D8C]/10",
   },

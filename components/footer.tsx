@@ -36,8 +36,8 @@ export function Footer() {
             </div>
             <div>
               <h3 className="mb-2 text-lg font-semibold">Office Address</h3>
-              <p className="text-base text-gray-200">123, Park Street, Sector 5</p>
-              <p className="text-base text-gray-200">Kolkata, West Bengal - 700001</p>
+              <p className="text-base text-gray-200">Shop No. C-12 Ground floor, Prabhat Darshan Building,</p>
+              <p className="text-base text-gray-200">Golibar Road, Khar (E), Mumbai -400051</p>
             </div>
           </div>
         </div>

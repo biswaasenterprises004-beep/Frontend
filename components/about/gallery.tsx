@@ -53,7 +53,7 @@ const galleryImages = [
 
 export function Gallery() {
   return (
-    <section className="bg-white px-4 py-16 lg:px-8">
+    <section className="bg-white px-4 py-12 lg:px-8 lg:py-16">
       <div className="mx-auto max-w-6xl">
         <div className="animate-on-load animate-zoom-in mb-12 text-center">
           <h2 className="mb-3 text-3xl font-bold text-[#FF6E39] lg:text-4xl">
@@ -62,12 +62,12 @@ export function Gallery() {
           <p className="text-gray-600">Glimpses of our work and team</p>
         </div>
 
-        <div className="overflow-x-auto scrollbar-hide">
-          <div className="flex gap-4 pb-4" style={{ minWidth: 'max-content' }}>
+        <div className="overflow-x-auto pb-2 scrollbar-hide lg:overflow-visible">
+          <div className="grid auto-cols-[78vw] grid-flow-col gap-4 pb-2 sm:auto-cols-[45vw] lg:grid-flow-row lg:grid-cols-3 xl:grid-cols-4 lg:auto-cols-auto lg:pb-0">
             {galleryImages.map((image, index) => (
               <div
                 key={`${image.src}-${index}`}
-                className="animate-on-load animate-zoom-in-up group relative h-64 w-64 flex-shrink-0 overflow-hidden rounded-xl"
+                className="animate-on-load animate-zoom-in-up group relative h-52 overflow-hidden rounded-xl sm:h-60 lg:h-64"
                 style={{ animationDelay: `${0.1 + index * 0.1}s` }}
               >
                 <Image

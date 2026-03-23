@@ -9,7 +9,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'Biswas Enterprise - Event Management & Labour Solutions',
-  description: 'Professional event management and labour solutions for all your corporate and social events in Kolkata, West Bengal',
+  description: 'Professional event management and labour solutions for all your corporate and social events. Office: Shop No. C-12 Ground floor, Prabhat Darshan Building, Golibar Road, Khar (E), Mumbai -400051',
   generator: 'v0.app',
   icons: {
     icon: [
